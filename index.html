@@ -1,1 +1,1364 @@
-https://share.gemini.google/bmvOiMgDdXIg
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>بوابة إدارة وتوزيع النماذج - قطاع المياه الجوفية</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS for Excel handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap');
+        body { font-family: 'Cairo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Header & Role Switcher -->
+    <header class="bg-sky-950 text-white shadow-lg sticky top-0 z-50 border-b border-sky-800">
+        <div class="container mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-sky-700 p-2.5 rounded-xl shadow-inner">
+                    <i class="fa-solid fa-water text-xl text-sky-200"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold">قطاع المياه الجوفية</h1>
+                    <p class="text-xs text-sky-300">منظومة إدارة وتجميع البيانات المركزية (Offline)</p>
+                </div>
+            </div>
+
+            <!-- Hierarchical Access Control & Storage Bar -->
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Active Role Selector -->
+                <div class="flex items-center gap-2 bg-sky-900 border border-sky-700 px-3 py-1.5 rounded-xl">
+                    <i class="fa-solid fa-user-shield text-amber-400 text-sm"></i>
+                    <label for="activeRoleSelect" class="text-xs text-sky-200 font-semibold hidden sm:inline">الدخول بصلاحية:</label>
+                    <select id="activeRoleSelect" onchange="changeActiveRole()" class="bg-sky-950 text-white text-xs font-bold py-1 px-2 rounded-lg border border-sky-700 outline-none focus:ring-2 focus:ring-amber-400">
+                        <!-- Populated dynamically via JS -->
+                    </select>
+                </div>
+
+                <button onclick="openStorageModal()" id="storageStatusBtn" class="bg-sky-800 hover:bg-sky-700 px-3 py-2 rounded-xl text-xs font-semibold border border-sky-600 flex items-center gap-2 transition">
+                    <i class="fa-solid fa-folder-open text-amber-400"></i>
+                    <span id="storagePathLabel" class="hidden md:inline">مسار التخزين</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="container mx-auto px-4 py-6 flex-grow max-w-7xl">
+        
+        <!-- Role Context Banner -->
+        <div id="roleBanner" class="mb-6 bg-gradient-to-l from-sky-900 to-sky-800 text-white p-4 rounded-2xl shadow-md flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div id="roleIconBox" class="bg-amber-500/20 text-amber-300 p-3 rounded-xl border border-amber-400/30">
+                    <i class="fa-solid fa-crown text-lg"></i>
+                </div>
+                <div>
+                    <span id="roleLevelBadge" class="text-[11px] bg-amber-500 text-slate-950 font-extrabold px-2.5 py-0.5 rounded-full">صلاحية عليا - رئاسة القطاع</span>
+                    <h2 id="roleTitleText" class="text-base font-bold mt-1">رئيس قطاع المياه الجوفية</h2>
+                    <p id="roleDescText" class="text-xs text-sky-200">صلاحية كاملة: إرسال التعميمات، ومشاهدة وتعديل بيانات كافة الإدارات المركزية والعامة.</p>
+                </div>
+            </div>
+            <div class="text-left">
+                <button onclick="openOrgStructureModal()" class="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+                    <i class="fa-solid fa-sitemap"></i> إدارة الهيكل التنظيمي للقطاع
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex flex-wrap gap-2 mb-6 border-b border-slate-200 pb-3">
+            <button onclick="switchTab('hierarchy')" id="btn-hierarchy" class="tab-btn px-4 py-2.5 rounded-xl text-sm font-bold bg-sky-700 text-white shadow-md transition flex items-center gap-2">
+                <i class="fa-solid fa-building-columns"></i> الإدارات المركزية والتابعة
+            </button>
+            <button onclick="switchTab('forms')" id="btn-forms" class="tab-btn px-4 py-2.5 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 transition flex items-center gap-2">
+                <i class="fa-solid fa-file-circle-plus"></i> إعداد وتوجيه نموذج / شيت
+            </button>
+            <button onclick="switchTab('workspace')" id="btn-workspace" class="tab-btn px-4 py-2.5 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 transition flex items-center gap-2">
+                <i class="fa-solid fa-pen-to-square"></i> تعبئة ومراجعة البيانات (<span id="accessibleTasksCount">0</span>)
+            </button>
+        </div>
+
+        <!-- TAB 1: Organizational Hierarchy & Dedicated Spaces -->
+        <section id="tab-hierarchy" class="tab-content space-y-6">
+            <div class="flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800">الهيكل التنظيمي والمساحات المخصصة للإدارات</h2>
+                    <p class="text-xs text-slate-500">يتم عرض الإدارات المركزية والإدارات العامة وفقاً لمستوى الصلاحية المحدد أعلاه.</p>
+                </div>
+                <div class="flex gap-2">
+                    <label class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer shadow transition flex items-center gap-2">
+                        <input type="file" accept=".xlsx,.xls" class="hidden" onchange="importOrgExcel(event)">
+                        <i class="fa-solid fa-file-excel"></i> تحديث الهيكل من شيت الإكسل
+                    </label>
+                </div>
+            </div>
+
+            <!-- Central Administrations Cards Grid -->
+            <div id="centralDeptsGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Populated dynamically via JS -->
+            </div>
+        </section>
+
+        <!-- TAB 2: Create & Dispatch Form to Central/General Depts -->
+        <section id="tab-forms" class="tab-content hidden space-y-6">
+            <div id="formsRestrictedNotice" class="hidden bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-2xl text-xs font-semibold flex items-center gap-3">
+                <i class="fa-solid fa-lock text-lg text-amber-600"></i>
+                <span>تنبيه: صلاحية إنشاء وتعميم النماذج الجديدة متاحة لرئاسة القطاع والإدارات المركزية فقط. يمكنك الانتقال لتبويب "تعبئة ومراجعة البيانات" لإدخال بيانات إدارتك.</span>
+            </div>
+
+            <div id="formBuilderCard" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <div class="flex justify-between items-center mb-6 pb-4 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800">إرسال بيان / نموذج مركزي للإدارات</h2>
+                        <p class="text-xs text-slate-500">حدد الإدارة المركزية أو الإدارات العامة المطلوب منها استيفاء البيان</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-2">عنوان البيان / النموذج المطلوب:</label>
+                        <input type="text" id="formTitle" placeholder="مثال: حصر الآبار الجوفية ومعدلات السحب الشهري" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-2">توجيه البيان إلى (الإدارة المركزية):</label>
+                        <select id="targetCentralSelect" onchange="updateTargetGeneralOptions()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-sky-500 outline-none">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Target General Departments Checkboxes -->
+                <div class="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="text-xs font-bold text-slate-700">الإدارات العامة المستهدفة بتعبئة البيان (كل إدارة ستعبئ نسختها بسرية تامة):</label>
+                        <button type="button" onclick="toggleAllGeneralCheckboxes()" class="text-xs text-sky-700 font-bold hover:underline">تحديد / إلغاء تحديد الكل</button>
+                    </div>
+                    <div id="targetGeneralCheckboxes" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Fields List Container -->
+                <div class="mb-6">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-sm font-bold text-slate-700">أعمدة وحقول الشيت المطلوب استيفاؤها (أو استوردها مباشرة من شيت إكسل نموذج):</h3>
+                        <div class="flex flex-wrap gap-2">
+                            <label class="text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold px-3 py-1.5 rounded-lg border border-emerald-200 cursor-pointer transition flex items-center gap-1">
+                                <input type="file" accept=".xlsx,.xls" class="hidden" onchange="importTemplateExcel(event)">
+                                <i class="fa-solid fa-file-excel"></i> استيراد الأعمدة من شيت نموذج
+                            </label>
+                            <button onclick="addFieldRow()" class="text-xs bg-sky-50 text-sky-700 hover:bg-sky-100 font-bold px-3 py-1.5 rounded-lg border border-sky-200 transition">
+                                <i class="fa-solid fa-plus mr-1"></i> إضافة حقل يدوياً
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="fieldsContainer" class="space-y-3">
+                        <div class="field-row grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-slate-50 p-3 rounded-xl border border-slate-200">
+                            <div class="md:col-span-6">
+                                <input type="text" placeholder="اسم العمود / البيان (مثال: عدد الآبار العاملة)" class="field-label w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs outline-none">
+                            </div>
+                            <div class="md:col-span-4">
+                                <select class="field-type w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs outline-none">
+                                    <option value="number">رقمي (حسابي)</option>
+                                    <option value="text">نص قصير</option>
+                                    <option value="date">تاريخ</option>
+                                    <option value="textarea">ملاحظات تفصيلية</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2 text-left">
+                                <button onclick="removeFieldRow(this)" class="text-rose-500 hover:text-rose-700 p-1.5 rounded"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dispatch Actions -->
+                <div class="flex flex-wrap gap-3 justify-end pt-4 border-t border-slate-100">
+                    <button onclick="dispatchFormToDepartments()" class="bg-sky-700 hover:bg-sky-800 text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow transition flex items-center gap-2">
+                        <i class="fa-solid fa-paper-plane"></i> اعتماد وتعميم البيان للإدارات المحددة
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 3: Workspace (Fill & Review Data with Strict Hierarchy Isolation) -->
+        <section id="tab-workspace" class="tab-content hidden space-y-6">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <div class="flex flex-wrap justify-between items-center mb-6 pb-4 border-b border-slate-100 gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800">مساحة العمل واستيفاء البيانات</h2>
+                        <p class="text-xs text-slate-500" id="workspaceSubTitle">تظهر هنا النماذج المسموح لك بالاطلاع عليها أو تعديلها فقط.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <label class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold cursor-pointer border border-slate-300 transition flex items-center gap-2">
+                            <input type="file" accept=".xlsx,.json" class="hidden" onchange="importDepartmentResponseFile(event)">
+                            <i class="fa-solid fa-file-import"></i> استيراد رد من ملف خارجي
+                        </label>
+                        <button id="exportConsolidatedBtn" onclick="exportConsolidatedExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition flex items-center gap-2">
+                            <i class="fa-solid fa-file-excel"></i> تصدير التجميعي المسموح (Excel)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Master Aggregation Template Card (Separate Output Template) -->
+                <div class="mb-6 bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4 flex flex-wrap justify-between items-center gap-4">
+                    <div class="flex items-start gap-3">
+                        <div class="bg-emerald-600 text-white p-2.5 rounded-xl mt-0.5">
+                            <i class="fa-solid fa-table-list text-base"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-bold text-emerald-950">قالب التجميع النهائي المخصص (Master Template)</h3>
+                            <p class="text-xs text-emerald-800 mt-0.5" id="masterTemplateStatus">
+                                لم يتم رفع قالب تجميعي مخصص بعد (سيتم التجميع افتراضياً بنفس أعمدة نموذج الإدخال).
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label class="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-2 rounded-xl text-xs font-bold cursor-pointer shadow-sm transition flex items-center gap-2">
+                            <input type="file" accept=".xlsx,.xls" class="hidden" onchange="uploadMasterConsolidationTemplate(event)">
+                            <i class="fa-solid fa-upload"></i> رفع شيت التجميع النهائي
+                        </label>
+                        <button id="clearMasterTemplateBtn" onclick="clearMasterTemplate()" class="hidden bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 px-3 py-2 rounded-xl text-xs font-bold transition">
+                            إلغاء القالب
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Active Forms Accordion/List -->
+                <div id="workspaceFormsList" class="space-y-6">
+                    <!-- Populated dynamically based on strict role permissions -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Manage Org Structure Modal -->
+    <div id="orgModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                    <i class="fa-solid fa-sitemap text-sky-600"></i> تعديل وإضافة الإدارات في قطاع المياه الجوفية
+                </h3>
+                <button onclick="closeOrgStructureModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            
+            <div class="overflow-y-auto flex-grow space-y-4 pr-1" id="orgEditorContainer">
+                <!-- Add new Central Dept -->
+                <div class="bg-sky-50 p-3 rounded-xl border border-sky-200 flex gap-2">
+                    <input type="text" id="newCentralName" placeholder="اسم الإدارة المركزية الجديدة..." class="flex-grow bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs outline-none">
+                    <button onclick="addCentralDept()" class="bg-sky-700 hover:bg-sky-800 text-white px-4 py-2 rounded-lg text-xs font-bold">إضافة مركزية</button>
+                </div>
+
+                <div id="orgTreeEditor" class="space-y-3">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-3 border-t border-slate-100">
+                <button onclick="closeOrgStructureModal()" class="bg-slate-800 text-white font-bold px-5 py-2 rounded-xl text-xs">حفظ وإغلاق</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Storage Directory Picker Modal -->
+    <div id="storageModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                    <i class="fa-solid fa-folder-tree text-sky-600"></i> تحديد مجلد تخزين المخرجات
+                </h3>
+                <button onclick="closeStorageModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+                اختر مجلداً على جهازك ليقوم النظام بحفظ ملفات الشيتات والتقارير المجمعة لقطاع المياه الجوفية بداخله مباشرة بدون إنترنت.
+            </p>
+            <div class="bg-sky-50 border border-sky-100 rounded-xl p-3 text-xs text-sky-900 font-medium" id="currentFolderDisplay">
+                المسار الحالي: التخزين المحلي للمتصفح
+            </div>
+            <div class="flex gap-3 pt-2">
+                <button onclick="pickStorageDirectory()" class="flex-1 bg-sky-700 hover:bg-sky-800 text-white font-bold py-2.5 rounded-xl text-xs shadow transition">
+                    تحديد مجلد من الجهاز
+                </button>
+                <button onclick="closeStorageModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2.5 rounded-xl text-xs transition">
+                    إغلاق
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 left-5 bg-slate-900 text-white px-4 py-3 rounded-xl text-xs shadow-xl transition-all duration-300 transform translate-y-20 opacity-0 z-50 flex items-center gap-3">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toastMsg">تم بنجاح</span>
+    </div>
+
+    <script>
+        // Exact Groundwater Sector Organizational Structure from user's official document
+        const defaultOrgStructure = {
+            sectorName: "قطاع المياه الجوفية",
+            centralDepts: [
+                {
+                    id: "c_1",
+                    name: "الادارة المركزية للمياه الجوفية لجنوب الصحراء الغربية",
+                    generalDepts: [
+                        { id: "g_101", name: "الادارة العامة للمياه الجوفية بالداخلة" },
+                        { id: "g_102", name: "الادارة العامة للمياه الجوفية الخارجة" },
+                        { id: "g_103", name: "الادارة العامة للمياه الجوفية الفرافرة" },
+                        { id: "g_104", name: "الادارة العامة لمحطات وطلمبات الفرافرة" },
+                        { id: "g_105", name: "الادارة العامة لمحطات وطلمبات الخارجة" },
+                        { id: "g_106", name: "الادارة العامة لمحطات وطلمبات باريس ودرب الاربعين" },
+                        { id: "g_107", name: "الادارة العامة لمحطات وطلمبات وسط الوادي بالداخلة" },
+                        { id: "g_108", name: "الادارة العامة لورش المركزية" },
+                        { id: "g_109", name: "الادارة العامة للشئون الكهربائية" }
+                    ]
+                },
+                {
+                    id: "c_2",
+                    name: "الادارة المركزية للمياه الجوفية لشمال الصحراء الغربية",
+                    generalDepts: [
+                        { id: "g_201", name: "الادارة العامة للمياه الجوفية للواحات البحرية" },
+                        { id: "g_202", name: "الادارة العامة للموارد المائية والرى بالساحل الشمالي بمطروح" },
+                        { id: "g_203", name: "الادارة العامة للموارد المائية والرى بسيوه" }
+                    ]
+                },
+                {
+                    id: "c_3",
+                    name: "الادارة المركزية للمياه الجوفية للوادي والدلتا",
+                    generalDepts: [
+                        { id: "g_301", name: "الادارة العامة للمياه الجوفية لشرق ووسط الدلتا" },
+                        { id: "g_302", name: "الادارة العامة للمياه الجوفية لغرب الدلتا" },
+                        { id: "g_303", name: "الادارة العامة للمياه الجوفية لشمال الوادى بالمنيا" },
+                        { id: "g_304", name: "الادارة العامة للمياه الجوفية لجنوب الوادى بقنا" }
+                    ]
+                },
+                {
+                    id: "c_4",
+                    name: "الادارة المركزية للمياه الجوفية لسيناء والصحراء الشرقية",
+                    generalDepts: [
+                        { id: "g_401", name: "الادارة العامة للمياه الجوفية لشمال سيناء" },
+                        { id: "g_402", name: "الادارة العامة للمياه الجوفية لجنوب سيناء" },
+                        { id: "g_403", name: "الادارة العامة للمياه الجوفية للبحر الاحمر بالغردقة" }
+                    ]
+                }
+            ]
+        };
+
+        // Application State (v2 key to load exact structure cleanly)
+        let orgData = JSON.parse(localStorage.getItem('gw_org_structure_v2')) || defaultOrgStructure;
+        let dispatchedForms = JSON.parse(localStorage.getItem('gw_dispatched_forms_v2')) || [];
+        let masterTemplateConfig = JSON.parse(localStorage.getItem('gw_master_template_v2')) || null;
+        
+        // Active Role State: { level: 'sector' | 'central' | 'general', id: string, centralId?: string, name: string }
+        let currentRole = { level: 'sector', id: 'sector_head', name: 'رئيس قطاع المياه الجوفية' };
+        let selectedDirectoryHandle = null;
+
+        // Initialize App
+        document.addEventListener('DOMContentLoaded', () => {
+            populateRoleSelector();
+            updateTargetCentralOptions();
+            updateMasterTemplateUI();
+            refreshUIByRole();
+        });
+
+        function saveState() {
+            localStorage.setItem('gw_org_structure_v2', JSON.stringify(orgData));
+            localStorage.setItem('gw_dispatched_forms_v2', JSON.stringify(dispatchedForms));
+            localStorage.setItem('gw_master_template_v2', JSON.stringify(masterTemplateConfig));
+        }
+
+        // Upload Separate Master Aggregation Template
+        function uploadMasterConsolidationTemplate(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                    const headerRowIndex = rows.findIndex(r => r && r.some(cell => cell !== null && cell !== undefined && cell.toString().trim() !== ''));
+                    if (headerRowIndex === -1) {
+                        showToast("لم يتم العثور على رؤوس أعمدة في قالب التجميع", "error");
+                        return;
+                    }
+
+                    const headers = rows[headerRowIndex].map(h => (h || '').toString().trim()).filter(Boolean);
+                    masterTemplateConfig = {
+                        fileName: file.name,
+                        sheetName: sheetName,
+                        headers: headers
+                    };
+                    saveState();
+                    updateMasterTemplateUI();
+                    showToast(`تم اعتماد قالب التجميع "${file.name}" (${headers.length} عمود) بنجاح!`);
+                } catch (err) {
+                    showToast("حدث خطأ أثناء قراءة قالب التجميع", "error");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function clearMasterTemplate() {
+            masterTemplateConfig = null;
+            saveState();
+            updateMasterTemplateUI();
+            showToast("تم إلغاء قالب التجميع المخصص والعودة للوضع الافتراضي");
+        }
+
+        function updateMasterTemplateUI() {
+            const statusEl = document.getElementById('masterTemplateStatus');
+            const clearBtn = document.getElementById('clearMasterTemplateBtn');
+            if (!statusEl || !clearBtn) return;
+
+            if (masterTemplateConfig) {
+                statusEl.innerHTML = `القالب المعتمد حالياً: <strong>${masterTemplateConfig.fileName}</strong> — الأعمدة: <span class="text-emerald-700 font-semibold">[${masterTemplateConfig.headers.join(' | ')}]</span>`;
+                clearBtn.classList.remove('hidden');
+            } else {
+                statusEl.innerText = 'لم يتم رفع قالب تجميعي مخصص بعد (سيتم التجميع افتراضياً بنفس أعمدة نموذج الإدخال).';
+                clearBtn.classList.add('hidden');
+            }
+        }
+
+        // Helper to build a consolidated row matching either the custom Master Template or default form fields
+        function buildConsolidatedRow(form, genId) {
+            const info = findDeptInfo(genId);
+            const resp = (form.responses && form.responses[genId]) || {};
+            const isFilled = Object.keys(resp).length > 0;
+
+            // Map form field labels (normalized) to their entered values
+            const labelValueMap = {};
+            form.fields.forEach(f => {
+                const normLabel = f.label.trim().replace(/\s+/g, ' ');
+                labelValueMap[normLabel] = resp[f.id] !== undefined ? resp[f.id] : "";
+            });
+
+            if (masterTemplateConfig && masterTemplateConfig.headers.length > 0) {
+                const row = {};
+                masterTemplateConfig.headers.forEach(header => {
+                    const cleanHeader = header.trim().replace(/\s+/g, ' ');
+                    if (cleanHeader.includes('المركزية')) {
+                        row[header] = info.centralName;
+                    } else if (cleanHeader.includes('العامة') || cleanHeader === 'الادارة' || cleanHeader === 'الإدارة') {
+                        row[header] = info.generalName;
+                    } else if (cleanHeader.includes('حالة') || cleanHeader.includes('الموقف')) {
+                        row[header] = isFilled ? "مستوفى" : "لم يرد بعد";
+                    } else if (labelValueMap[cleanHeader] !== undefined) {
+                        row[header] = labelValueMap[cleanHeader];
+                    } else {
+                        // Partial match fallback between master template header and input field label
+                        const partialKey = Object.keys(labelValueMap).find(k => k.includes(cleanHeader) || cleanHeader.includes(k));
+                        row[header] = partialKey ? labelValueMap[partialKey] : "";
+                    }
+                });
+                return row;
+            }
+
+            // Default structure when no separate master template is uploaded
+            const defaultRow = {
+                "الإدارة المركزية": info.centralName,
+                "الإدارة العامة": info.generalName,
+                "حالة الاستيفاء": isFilled ? "مستوفى" : "لم يرد بعد"
+            };
+            form.fields.forEach(f => {
+                defaultRow[f.label] = resp[f.id] !== undefined ? resp[f.id] : "";
+            });
+            return defaultRow;
+        }
+
+        // Populate Role Switcher Dropdown
+        function populateRoleSelector() {
+            const select = document.getElementById('activeRoleSelect');
+            if (!select) return;
+            select.innerHTML = '';
+
+            // 1. Sector Head Option
+            const sectorOpt = document.createElement('option');
+            sectorOpt.value = JSON.stringify({ level: 'sector', id: 'sector_head', name: 'رئيس قطاع المياه الجوفية' });
+            sectorOpt.textContent = '👑 رئيس قطاع المياه الجوفية (صلاحية كاملة)';
+            select.appendChild(sectorOpt);
+
+            // 2. Central & General Administrations
+            orgData.centralDepts.forEach(cDept => {
+                const optGroup = document.createElement('optgroup');
+                optGroup.label = `🏛️ ${cDept.name}`;
+
+                const centralOpt = document.createElement('option');
+                centralOpt.value = JSON.stringify({ level: 'central', id: cDept.id, name: `رئيس ${cDept.name}` });
+                centralOpt.textContent = `⭐ رئيس ${cDept.name}`;
+                optGroup.appendChild(centralOpt);
+
+                cDept.generalDepts.forEach(gDept => {
+                    const genOpt = document.createElement('option');
+                    genOpt.value = JSON.stringify({ level: 'general', id: gDept.id, centralId: cDept.id, name: gDept.name });
+                    genOpt.textContent = `   ↳ ${gDept.name}`;
+                    optGroup.appendChild(genOpt);
+                });
+
+                select.appendChild(optGroup);
+            });
+
+            // Restore selected option if it still exists
+            const options = Array.from(select.options);
+            const matched = options.find(o => {
+                try {
+                    const parsed = JSON.parse(o.value);
+                    return parsed.level === currentRole.level && parsed.id === currentRole.id;
+                } catch { return false; }
+            });
+            if (matched) {
+                select.value = matched.value;
+            } else {
+                currentRole = JSON.parse(select.options[0].value);
+            }
+        }
+
+        // Handle Role Change
+        function changeActiveRole() {
+            const select = document.getElementById('activeRoleSelect');
+            currentRole = JSON.parse(select.value);
+            updateTargetCentralOptions();
+            refreshUIByRole();
+            showToast(`تم التبديل إلى صلاحية: ${currentRole.name}`);
+        }
+
+        // Refresh UI components according to active role hierarchy
+        function refreshUIByRole() {
+            const badge = document.getElementById('roleLevelBadge');
+            const title = document.getElementById('roleTitleText');
+            const desc = document.getElementById('roleDescText');
+            const iconBox = document.getElementById('roleIconBox');
+            const formsRestricted = document.getElementById('formsRestrictedNotice');
+            const formBuilderCard = document.getElementById('formBuilderCard');
+            const workspaceSubTitle = document.getElementById('workspaceSubTitle');
+
+            if (currentRole.level === 'sector') {
+                badge.innerText = 'صلاحية عليا - رئاسة القطاع';
+                badge.className = 'text-[11px] bg-amber-500 text-slate-950 font-extrabold px-2.5 py-0.5 rounded-full';
+                iconBox.innerHTML = '<i class="fa-solid fa-crown text-lg"></i>';
+                title.innerText = currentRole.name;
+                desc.innerText = 'صلاحية كاملة: إرسال التعميمات، ومشاهدة وتعديل بيانات كافة الإدارات المركزية والعامة وتجميعها.';
+                formsRestricted.classList.add('hidden');
+                formBuilderCard.classList.remove('hidden');
+                workspaceSubTitle.innerText = 'بصفتك رئيس القطاع، يمكنك مشاهدة وتعديل وتصدير بيانات كافة الإدارات المركزية والعامة.';
+            } else if (currentRole.level === 'central') {
+                badge.innerText = 'صلاحية وسطى - إدارة مركزية';
+                badge.className = 'text-[11px] bg-sky-400 text-slate-950 font-extrabold px-2.5 py-0.5 rounded-full';
+                iconBox.innerHTML = '<i class="fa-solid fa-building-shield text-lg"></i>';
+                title.innerText = currentRole.name;
+                desc.innerText = 'صلاحية إشرافية: توجيه النماذج ومشاهدة وتعديل بيانات الإدارات العامة التابعة لإدارتك المركزية فقط.';
+                formsRestricted.classList.add('hidden');
+                formBuilderCard.classList.remove('hidden');
+                workspaceSubTitle.innerText = 'تظهر هنا بيانات الإدارات العامة التابعة لإدارتك المركزية فقط (مع حجب الإدارات المركزية الأخرى).';
+            } else {
+                badge.innerText = 'صلاحية تنفيذية - إدارة عامة';
+                badge.className = 'text-[11px] bg-emerald-400 text-slate-950 font-extrabold px-2.5 py-0.5 rounded-full';
+                iconBox.innerHTML = '<i class="fa-solid fa-user-lock text-lg"></i>';
+                title.innerText = currentRole.name;
+                desc.innerText = 'مساحة معزولة: يمكنك تعبئة وتعديل بيانات إدارتك العامة فقط دون الاطلاع على بيانات الإدارات الأخرى.';
+                formsRestricted.classList.remove('hidden');
+                formBuilderCard.classList.add('hidden');
+                workspaceSubTitle.innerText = 'بيانات إدارتك العامة معزولة تماماً ولا يمكن لأي إدارة عامة أخرى الاطلاع عليها.';
+            }
+
+            renderHierarchyCards();
+            renderWorkspaceForms();
+        }
+
+        // Render Central & General Administrations Cards
+        function renderHierarchyCards() {
+            const grid = document.getElementById('centralDeptsGrid');
+            grid.innerHTML = '';
+
+            let visibleCentralDepts = orgData.centralDepts;
+            if (currentRole.level === 'central') {
+                visibleCentralDepts = orgData.centralDepts.filter(c => c.id === currentRole.id);
+            } else if (currentRole.level === 'general') {
+                visibleCentralDepts = orgData.centralDepts.filter(c => c.id === currentRole.centralId);
+            }
+
+            visibleCentralDepts.forEach(cDept => {
+                let visibleGenerals = cDept.generalDepts;
+                if (currentRole.level === 'general') {
+                    visibleGenerals = cDept.generalDepts.filter(g => g.id === currentRole.id);
+                }
+
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col';
+
+                const generalItemsHTML = visibleGenerals.map(gDept => {
+                    const assignedCount = dispatchedForms.filter(f => f.targetGeneralIds.includes(gDept.id)).length;
+                    const completedCount = dispatchedForms.filter(f => f.targetGeneralIds.includes(gDept.id) && f.responses && f.responses[gDept.id]).length;
+
+                    return `
+                        <div class="flex flex-wrap justify-between items-center p-3 bg-slate-50 hover:bg-sky-50/60 rounded-xl border border-slate-200/80 transition gap-2">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-8 h-8 rounded-lg bg-sky-100 text-sky-800 flex items-center justify-center text-xs font-bold">
+                                    <i class="fa-solid fa-water"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-xs font-bold text-slate-800">${gDept.name}</h4>
+                                    <span class="text-[11px] text-slate-500">النماذج المستوفاة: <strong class="text-emerald-600">${completedCount}</strong> / ${assignedCount}</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                ${currentRole.level !== 'general' ? `
+                                    <button onclick="quickSendToDept('${cDept.id}', '${gDept.id}')" class="text-[11px] bg-sky-700 hover:bg-sky-800 text-white px-2.5 py-1.5 rounded-lg font-bold transition">
+                                        <i class="fa-solid fa-paper-plane ml-1"></i> إرسال بيان
+                                    </button>
+                                ` : ''}
+                                <button onclick="switchTab('workspace')" class="text-[11px] bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-2.5 py-1.5 rounded-lg font-bold transition">
+                                    فتح المساحة
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                card.innerHTML = `
+                    <div class="bg-sky-900 text-white px-5 py-3.5 flex justify-between items-center">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid fa-landmark text-amber-400"></i>
+                            <h3 class="text-sm font-bold">${cDept.name}</h3>
+                        </div>
+                        <span class="text-[11px] bg-sky-800 px-2.5 py-0.5 rounded-full text-sky-200 border border-sky-700">
+                            ${visibleGenerals.length} إدارة عامة
+                        </span>
+                    </div>
+                    <div class="p-4 space-y-2.5 flex-grow">
+                        ${generalItemsHTML || '<p class="text-xs text-slate-400 text-center py-4">لا توجد إدارات عامة مسجلة</p>'}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Quick jump to Form Builder pre-selected for a specific Central & General Dept
+        function quickSendToDept(centralId, generalId) {
+            switchTab('forms');
+            const centralSelect = document.getElementById('targetCentralSelect');
+            centralSelect.value = centralId;
+            updateTargetGeneralOptions();
+            document.querySelectorAll('.target-gen-cb').forEach(cb => {
+                cb.checked = (cb.value === generalId);
+            });
+        }
+
+        // Populate Target Central Dept Dropdown in Form Builder
+        function updateTargetCentralOptions() {
+            const select = document.getElementById('targetCentralSelect');
+            if (!select) return;
+            select.innerHTML = '';
+
+            if (currentRole.level === 'sector') {
+                const allOpt = document.createElement('option');
+                allOpt.value = 'ALL_CENTRAL';
+                allOpt.textContent = '🌐 تعميم على كافة الإدارات المركزية بالقطاع';
+                select.appendChild(allOpt);
+            }
+
+            const allowedCentrals = currentRole.level === 'central'
+                ? orgData.centralDepts.filter(c => c.id === currentRole.id)
+                : orgData.centralDepts;
+
+            allowedCentrals.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.id;
+                opt.textContent = c.name;
+                select.appendChild(opt);
+            });
+
+            updateTargetGeneralOptions();
+        }
+
+        // Populate Target General Depts Checkboxes
+        function updateTargetGeneralOptions() {
+            const centralVal = document.getElementById('targetCentralSelect').value;
+            const container = document.getElementById('targetGeneralCheckboxes');
+            container.innerHTML = '';
+
+            let targetGenerals = [];
+            if (centralVal === 'ALL_CENTRAL') {
+                orgData.centralDepts.forEach(c => {
+                    c.generalDepts.forEach(g => targetGenerals.push({ ...g, centralName: c.name }));
+                });
+            } else {
+                const cDept = orgData.centralDepts.find(c => c.id === centralVal);
+                if (cDept) {
+                    targetGenerals = cDept.generalDepts.map(g => ({ ...g, centralName: cDept.name }));
+                }
+            }
+
+            targetGenerals.forEach(g => {
+                const label = document.createElement('label');
+                label.className = 'flex items-center gap-2 bg-white p-2.5 rounded-lg border border-slate-200 cursor-pointer hover:border-sky-400 text-xs';
+                label.innerHTML = `
+                    <input type="checkbox" value="${g.id}" checked class="target-gen-cb accent-sky-700 w-4 h-4">
+                    <span class="font-semibold text-slate-700 truncate" title="${g.name}">${g.name}</span>
+                `;
+                container.appendChild(label);
+            });
+        }
+
+        function toggleAllGeneralCheckboxes() {
+            const checkboxes = document.querySelectorAll('.target-gen-cb');
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            checkboxes.forEach(cb => cb.checked = !allChecked);
+        }
+
+        // Add/Remove Custom Field Rows in Form Builder
+        function addFieldRow() {
+            const container = document.getElementById('fieldsContainer');
+            const row = document.createElement('div');
+            row.className = 'field-row grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-slate-50 p-3 rounded-xl border border-slate-200';
+            row.innerHTML = `
+                <div class="md:col-span-6">
+                    <input type="text" placeholder="اسم العمود / البيان" class="field-label w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs outline-none">
+                </div>
+                <div class="md:col-span-4">
+                    <select class="field-type w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs outline-none">
+                        <option value="number">رقمي (حسابي)</option>
+                        <option value="text">نص قصير</option>
+                        <option value="date">تاريخ</option>
+                        <option value="textarea">ملاحظات تفصيلية</option>
+                    </select>
+                </div>
+                <div class="md:col-span-2 text-left">
+                    <button onclick="removeFieldRow(this)" class="text-rose-500 hover:text-rose-700 p-1.5 rounded"><i class="fa-solid fa-trash-can"></i></button>
+                </div>
+            `;
+            container.appendChild(row);
+        }
+
+        function removeFieldRow(btn) {
+            const rows = document.querySelectorAll('.field-row');
+            if (rows.length > 1) {
+                btn.closest('.field-row').remove();
+            } else {
+                showToast("يجب أن يحتوي النموذج على عمود واحد على الأقل", "error");
+            }
+        }
+
+        // Dispatch Form to Selected General Administrations
+        function dispatchFormToDepartments() {
+            const title = document.getElementById('formTitle').value.trim();
+            if (!title) {
+                showToast("يرجى إدخال عنوان البيان أو النموذج أولاً", "error");
+                return;
+            }
+
+            const selectedGenIds = Array.from(document.querySelectorAll('.target-gen-cb:checked')).map(cb => cb.value);
+            if (selectedGenIds.length === 0) {
+                showToast("يرجى تحديد إدارة عامة واحدة على الأقل", "error");
+                return;
+            }
+
+            const fields = [];
+            document.querySelectorAll('.field-row').forEach((row, idx) => {
+                const label = row.querySelector('.field-label').value.trim();
+                const type = row.querySelector('.field-type').value;
+                if (label) {
+                    fields.push({ id: 'fld_' + idx + '_' + Date.now(), label, type });
+                }
+            });
+
+            if (fields.length === 0) {
+                showToast("يرجى إضافة عمود واحد على الأقل للنموذج", "error");
+                return;
+            }
+
+            const newForm = {
+                id: 'form_' + Date.now(),
+                title,
+                createdBy: currentRole.name,
+                createdAt: new Date().toLocaleDateString('ar-EG'),
+                targetGeneralIds: selectedGenIds,
+                fields,
+                responses: {}
+            };
+
+            dispatchedForms.unshift(newForm);
+            saveState();
+
+            document.getElementById('formTitle').value = '';
+            refreshUIByRole();
+            switchTab('workspace');
+            showToast(`تم تعميم النموذج بنجاح على ${selectedGenIds.length} إدارة عامة!`);
+        }
+
+        // Render Workspace Forms Filtered by Strict Hierarchy
+        function renderWorkspaceForms() {
+            const container = document.getElementById('workspaceFormsList');
+            const countBadge = document.getElementById('accessibleTasksCount');
+            container.innerHTML = '';
+
+            // Filter forms accessible to current role
+            const accessibleForms = dispatchedForms.filter(form => {
+                if (currentRole.level === 'sector') return true;
+                if (currentRole.level === 'central') {
+                    const cDept = orgData.centralDepts.find(c => c.id === currentRole.id);
+                    if (!cDept) return false;
+                    const myGenIds = cDept.generalDepts.map(g => g.id);
+                    return form.targetGeneralIds.some(id => myGenIds.includes(id));
+                }
+                if (currentRole.level === 'general') {
+                    return form.targetGeneralIds.includes(currentRole.id);
+                }
+                return false;
+            });
+
+            countBadge.innerText = accessibleForms.length;
+
+            if (accessibleForms.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
+                        <i class="fa-solid fa-folder-open text-3xl text-slate-300 mb-3"></i>
+                        <p class="text-sm font-bold text-slate-600">لا توجد نماذج موجهة حالياً ضمن نطاق صلاحيتك</p>
+                        <p class="text-xs text-slate-400 mt-1">يمكن لرئيس القطاع أو رئيس الإدارة المركزية إنشاء وتعميم نموذج جديد من التبويب السابق.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            accessibleForms.forEach(form => {
+                // Determine which general departments this role can see inside this form
+                let visibleGenIds = form.targetGeneralIds;
+                if (currentRole.level === 'central') {
+                    const cDept = orgData.centralDepts.find(c => c.id === currentRole.id);
+                    const myGenIds = cDept ? cDept.generalDepts.map(g => g.id) : [];
+                    visibleGenIds = form.targetGeneralIds.filter(id => myGenIds.includes(id));
+                } else if (currentRole.level === 'general') {
+                    visibleGenIds = [currentRole.id];
+                }
+
+                const formCard = document.createElement('div');
+                formCard.className = 'border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50';
+
+                const deptRowsHTML = visibleGenIds.map(genId => {
+                    const info = findDeptInfo(genId);
+                    const existingResp = (form.responses && form.responses[genId]) || {};
+                    const isFilled = Object.keys(existingResp).length > 0;
+
+                    const inputsHTML = form.fields.map(f => {
+                        const val = existingResp[f.id] || '';
+                        if (f.type === 'textarea') {
+                            return `
+                                <div class="col-span-1 sm:col-span-2">
+                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">${f.label}</label>
+                                    <textarea data-field="${f.id}" rows="2" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-sky-500">${val}</textarea>
+                                </div>
+                            `;
+                        }
+                        return `
+                            <div>
+                                <label class="block text-[11px] font-bold text-slate-600 mb-1">${f.label}</label>
+                                <input type="${f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : 'text')}" data-field="${f.id}" value="${val}" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-sky-500">
+                            </div>
+                        `;
+                    }).join('');
+
+                    return `
+                        <div class="bg-white p-4 rounded-xl border ${isFilled ? 'border-emerald-200' : 'border-slate-200'} shadow-sm space-y-3" id="resp_box_${form.id}_${genId}">
+                            <div class="flex flex-wrap justify-between items-center gap-2 pb-2 border-b border-slate-100">
+                                <div>
+                                    <span class="text-[10px] text-sky-700 font-bold block">${info.centralName}</span>
+                                    <h4 class="text-xs font-extrabold text-slate-800">${info.generalName}</h4>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold ${isFilled ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
+                                        ${isFilled ? '✓ تم الاستيفاء' : '⏳ قيد الانتظار'}
+                                    </span>
+                                    <button onclick="downloadSingleDeptTemplate('${form.id}', '${genId}')" title="تحميل شيت إكسل خاص بهذه الإدارة لإرساله أو ملئه" class="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg font-bold border border-slate-300">
+                                        <i class="fa-solid fa-download ml-1"></i> شيت الإدارة
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                ${inputsHTML}
+                            </div>
+
+                            <div class="flex justify-end pt-2">
+                                <button onclick="saveDepartmentData('${form.id}', '${genId}')" class="bg-sky-700 hover:bg-sky-800 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow transition">
+                                    <i class="fa-solid fa-floppy-disk ml-1"></i> حفظ بيانات الإدارة
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                formCard.innerHTML = `
+                    <div class="bg-slate-800 text-white px-5 py-3.5 flex flex-wrap justify-between items-center gap-3">
+                        <div>
+                            <h3 class="text-sm font-bold flex items-center gap-2">
+                                <i class="fa-solid fa-file-lines text-amber-400"></i> ${form.title}
+                            </h3>
+                            <p class="text-[11px] text-slate-300 mt-0.5">جهة الإصدار: ${form.createdBy} | التاريخ: ${form.createdAt}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="exportSingleFormConsolidated('${form.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
+                                <i class="fa-solid fa-file-excel"></i> تجميع هذا النموذج في شيت واحد
+                            </button>
+                            ${currentRole.level === 'sector' ? `
+                                <button onclick="deleteForm('${form.id}')" class="bg-rose-600/80 hover:bg-rose-600 text-white px-2.5 py-1.5 rounded-lg text-xs" title="حذف النموذج">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div class="p-4 space-y-4">
+                        ${deptRowsHTML}
+                    </div>
+                `;
+                container.appendChild(formCard);
+            });
+        }
+
+        function findDeptInfo(genId) {
+            for (const c of orgData.centralDepts) {
+                const g = c.generalDepts.find(item => item.id === genId);
+                if (g) return { centralId: c.id, centralName: c.name, generalName: g.name };
+            }
+            return { centralId: '', centralName: 'غير محدد', generalName: 'إدارة غير معروفة' };
+        }
+
+        // Save Data for a Specific General Administration
+        function saveDepartmentData(formId, genId) {
+            const form = dispatchedForms.find(f => f.id === formId);
+            if (!form) return;
+
+            const box = document.getElementById(`resp_box_${formId}_${genId}`);
+            if (!box) return;
+
+            if (!form.responses) form.responses = {};
+            const entry = {};
+            box.querySelectorAll('[data-field]').forEach(input => {
+                entry[input.getAttribute('data-field')] = input.value;
+            });
+
+            form.responses[genId] = entry;
+            saveState();
+            renderHierarchyCards();
+            renderWorkspaceForms();
+            showToast("تم حفظ بيانات الإدارة بنجاح!");
+        }
+
+        function deleteForm(formId) {
+            dispatchedForms = dispatchedForms.filter(f => f.id !== formId);
+            saveState();
+            refreshUIByRole();
+            showToast("تم حذف النموذج");
+        }
+
+        // Download Individual Excel Sheet for One General Department (to fill offline and re-import)
+        async function downloadSingleDeptTemplate(formId, genId) {
+            const form = dispatchedForms.find(f => f.id === formId);
+            if (!form) return;
+            const info = findDeptInfo(genId);
+            const existing = (form.responses && form.responses[genId]) || {};
+
+            const rowObj = {
+                "كود النموذج": form.id,
+                "كود الإدارة": genId,
+                "الإدارة المركزية": info.centralName,
+                "الإدارة العامة": info.generalName
+            };
+            form.fields.forEach(f => {
+                rowObj[f.label] = existing[f.id] || "";
+            });
+
+            const ws = XLSX.utils.json_to_sheet([rowObj]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "بيان الإدارة");
+            await saveWorkbookToDisk(wb, `${form.title} - ${info.generalName}.xlsx`);
+        }
+
+        // Import Filled Excel/JSON Sheet from a Subordinate Department
+        function importDepartmentResponseFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet);
+
+                    let importedCount = 0;
+                    rows.forEach(row => {
+                        const formId = row["كود النموذج"];
+                        const genId = row["كود الإدارة"];
+                        const form = dispatchedForms.find(f => f.id === formId);
+                        if (!form || !genId) return;
+
+                        // Check permission before importing
+                        if (currentRole.level === 'general' && genId !== currentRole.id) return;
+                        if (currentRole.level === 'central') {
+                            const cDept = orgData.centralDepts.find(c => c.id === currentRole.id);
+                            if (!cDept || !cDept.generalDepts.some(g => g.id === genId)) return;
+                        }
+
+                        if (!form.responses) form.responses = {};
+                        const entry = {};
+                        form.fields.forEach(f => {
+                            if (row[f.label] !== undefined) {
+                                entry[f.id] = row[f.label];
+                            }
+                        });
+                        form.responses[genId] = entry;
+                        importedCount++;
+                    });
+
+                    if (importedCount > 0) {
+                        saveState();
+                        refreshUIByRole();
+                        showToast(`تم استيراد ودمج بيانات ${importedCount} إدارة بنجاح!`);
+                    } else {
+                        showToast("لم يتم العثور على بيانات مطابقة لصلاحياتك في الملف", "error");
+                    }
+                } catch (err) {
+                    showToast("حدث خطأ أثناء قراءة الملف المستورد", "error");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Consolidate & Export a Single Form into One Unified Excel Sheet
+        async function exportSingleFormConsolidated(formId) {
+            const form = dispatchedForms.find(f => f.id === formId);
+            if (!form) return;
+
+            let allowedGenIds = form.targetGeneralIds;
+            if (currentRole.level === 'central') {
+                const cDept = orgData.centralDepts.find(c => c.id === currentRole.id);
+                const myGenIds = cDept ? cDept.generalDepts.map(g => g.id) : [];
+                allowedGenIds = form.targetGeneralIds.filter(id => myGenIds.includes(id));
+            } else if (currentRole.level === 'general') {
+                allowedGenIds = [currentRole.id];
+            }
+
+            const consolidatedRows = allowedGenIds.map(genId => buildConsolidatedRow(form, genId));
+
+            const ws = XLSX.utils.json_to_sheet(consolidatedRows);
+            const wb = XLSX.utils.book_new();
+            const targetSheetName = masterTemplateConfig ? masterTemplateConfig.sheetName : "التجميعي";
+            XLSX.utils.book_append_sheet(wb, ws, targetSheetName);
+            await saveWorkbookToDisk(wb, `تجميعي - ${form.title}.xlsx`);
+        }
+
+        // Export All Permitted Forms Consolidated in One Multi-Sheet Excel Workbook
+        async function exportConsolidatedExcel() {
+            if (dispatchedForms.length === 0) {
+                showToast("لا توجد نماذج لتصديرها حالياً", "error");
+                return;
+            }
+
+            const wb = XLSX.utils.book_new();
+            let sheetsAdded = 0;
+
+            dispatchedForms.forEach((form, idx) => {
+                let allowedGenIds = form.targetGeneralIds;
+                if (currentRole.level === 'central') {
+                    const cDept = orgData.centralDepts.find(c => c.id === currentRole.id);
+                    const myGenIds = cDept ? cDept.generalDepts.map(g => g.id) : [];
+                    allowedGenIds = form.targetGeneralIds.filter(id => myGenIds.includes(id));
+                } else if (currentRole.level === 'general') {
+                    allowedGenIds = form.targetGeneralIds.includes(currentRole.id) ? [currentRole.id] : [];
+                }
+
+                if (allowedGenIds.length === 0) return;
+
+                const rows = allowedGenIds.map(genId => buildConsolidatedRow(form, genId));
+
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const safeSheetName = (form.title || `نموذج_${idx + 1}`).substring(0, 28);
+                XLSX.utils.book_append_sheet(wb, ws, safeSheetName);
+                sheetsAdded++;
+            });
+
+            if (sheetsAdded === 0) {
+                showToast("لا توجد بيانات متاحة للتصدير ضمن نطاق صلاحياتك", "error");
+                return;
+            }
+
+            await saveWorkbookToDisk(wb, `التقرير_التجميعي_لقطاع_المياه_الجوفية.xlsx`);
+        }
+
+        // Save Workbook to User-Picked Directory or Standard Browser Download
+        async function saveWorkbookToDisk(wb, fileName) {
+            const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            if (selectedDirectoryHandle) {
+                try {
+                    const fileHandle = await selectedDirectoryHandle.getFileHandle(fileName, { create: true });
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(new Uint8Array(wbOut));
+                    await writable.close();
+                    showToast(`تم حفظ الملف "${fileName}" في مجلد التخزين المحدد!`);
+                    return;
+                } catch (err) {
+                    // Fallback to standard download if directory permission expired
+                }
+            }
+            XLSX.writeFile(wb, fileName);
+            showToast(`تم تحميل الملف "${fileName}" بنجاح!`);
+        }
+
+        // Import Form Columns directly from an uploaded Excel Template
+        function importTemplateExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                    // Find the first non-empty row as column headers
+                    const headerRow = rows.find(r => r && r.some(cell => cell !== null && cell !== undefined && cell.toString().trim() !== ''));
+                    if (!headerRow || headerRow.length === 0) {
+                        showToast("لم يتم العثور على رؤوس أعمدة في الملف المرفوع", "error");
+                        return;
+                    }
+
+                    // Auto-fill form title from file name if empty
+                    const titleInput = document.getElementById('formTitle');
+                    if (!titleInput.value.trim()) {
+                        titleInput.value = file.name.replace(/\.[^/.]+$/, "");
+                    }
+
+                    // Populate fieldsContainer with imported headers (excluding dept name columns if already present)
+                    const container = document.getElementById('fieldsContainer');
+                    container.innerHTML = '';
+
+                    let addedCount = 0;
+                    headerRow.forEach(colName => {
+                        const cleanName = (colName || '').toString().trim();
+                        if (!cleanName) return;
+                        // Skip auto-generated hierarchy columns if user's template already included them
+                        if (cleanName === 'الإدارة المركزية' || cleanName === 'الادارة المركزية' || cleanName === 'الإدارة العامة' || cleanName === 'الادارة العامة') return;
+
+                        const row = document.createElement('div');
+                        row.className = 'field-row grid grid-cols-1 md:grid-cols-12 gap-3 items-center bg-slate-50 p-3 rounded-xl border border-slate-200';
+                        row.innerHTML = `
+                            <div class="md:col-span-6">
+                                <input type="text" value="${cleanName}" class="field-label w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs outline-none">
+                            </div>
+                            <div class="md:col-span-4">
+                                <select class="field-type w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-xs outline-none">
+                                    <option value="text">نص / رقم</option>
+                                    <option value="number">رقمي (حسابي)</option>
+                                    <option value="date">تاريخ</option>
+                                    <option value="textarea">ملاحظات تفصيلية</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2 text-left">
+                                <button onclick="removeFieldRow(this)" class="text-rose-500 hover:text-rose-700 p-1.5 rounded"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        `;
+                        container.appendChild(row);
+                        addedCount++;
+                    });
+
+                    showToast(`تم استيراد ${addedCount} عمود من شيت النموذج بنجاح!`);
+                } catch (err) {
+                    showToast("حدث خطأ أثناء قراءة شيت النموذج", "error");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Import Organizational Hierarchy from User's Excel Sheet
+        function importOrgExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                    // Parse 2-column hierarchy: Col 0 = الإدارة المركزية, Col 1 = الإدارة العامة
+                    const centralMap = new Map();
+                    rows.forEach((row, index) => {
+                        if (index === 0) return; // skip header
+                        const centralName = (row[0] || '').toString().trim();
+                        const generalName = (row[1] || '').toString().trim();
+                        if (!centralName) return;
+
+                        if (!centralMap.has(centralName)) {
+                            centralMap.set(centralName, {
+                                id: 'c_' + Math.random().toString(36).substr(2, 6),
+                                name: centralName,
+                                generalDepts: []
+                            });
+                        }
+                        if (generalName) {
+                            centralMap.get(centralName).generalDepts.push({
+                                id: 'g_' + Math.random().toString(36).substr(2, 6),
+                                name: generalName
+                            });
+                        }
+                    });
+
+                    if (centralMap.size > 0) {
+                        orgData.centralDepts = Array.from(centralMap.values());
+                        saveState();
+                        populateRoleSelector();
+                        refreshUIByRole();
+                        showToast("تم تحديث الهيكل التنظيمي لقطاع المياه الجوفية من ملف الإكسل!");
+                    } else {
+                        showToast("تأكد من أن العمود الأول للإدارات المركزية والثاني للإدارات العامة", "error");
+                    }
+                } catch (err) {
+                    showToast("تعذر قراءة شيت الهيكل التنظيمي", "error");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Org Structure Modal Editor
+        function openOrgStructureModal() {
+            renderOrgTreeEditor();
+            document.getElementById('orgModal').classList.remove('hidden');
+        }
+        function closeOrgStructureModal() {
+            document.getElementById('orgModal').classList.add('hidden');
+            populateRoleSelector();
+            refreshUIByRole();
+        }
+
+        function renderOrgTreeEditor() {
+            const container = document.getElementById('orgTreeEditor');
+            container.innerHTML = '';
+
+            orgData.centralDepts.forEach((cDept, cIdx) => {
+                const box = document.createElement('div');
+                box.className = 'border border-slate-200 rounded-xl p-3 bg-slate-50 space-y-2';
+                
+                const genList = cDept.generalDepts.map((g, gIdx) => `
+                    <div class="flex justify-between items-center bg-white px-3 py-1.5 rounded-lg border border-slate-200 text-xs">
+                        <span>${g.name}</span>
+                        <button onclick="deleteGeneralDept(${cIdx}, ${gIdx})" class="text-rose-500 hover:text-rose-700"><i class="fa-solid fa-trash-can"></i></button>
+                    </div>
+                `).join('');
+
+                box.innerHTML = `
+                    <div class="flex justify-between items-center font-bold text-xs text-sky-900">
+                        <span>🏛️ ${cDept.name}</span>
+                        <button onclick="deleteCentralDept(${cIdx})" class="text-rose-600 hover:underline text-[11px]">حذف المركزية</button>
+                    </div>
+                    <div class="space-y-1.5 pr-4">${genList}</div>
+                    <div class="flex gap-2 pr-4 pt-1">
+                        <input type="text" id="newGen_${cIdx}" placeholder="إضافة إدارة عامة تابعة..." class="flex-grow bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs outline-none">
+                        <button onclick="addGeneralDept(${cIdx})" class="bg-emerald-600 text-white px-3 py-1 rounded-lg text-xs font-bold">إضافة</button>
+                    </div>
+                `;
+                container.appendChild(box);
+            });
+        }
+
+        function addCentralDept() {
+            const input = document.getElementById('newCentralName');
+            const name = input.value.trim();
+            if (!name) return;
+            orgData.centralDepts.push({
+                id: 'c_' + Date.now(),
+                name,
+                generalDepts: []
+            });
+            input.value = '';
+            saveState();
+            renderOrgTreeEditor();
+        }
+
+        function deleteCentralDept(cIdx) {
+            orgData.centralDepts.splice(cIdx, 1);
+            saveState();
+            renderOrgTreeEditor();
+        }
+
+        function addGeneralDept(cIdx) {
+            const input = document.getElementById(`newGen_${cIdx}`);
+            const name = input.value.trim();
+            if (!name) return;
+            orgData.centralDepts[cIdx].generalDepts.push({
+                id: 'g_' + Date.now(),
+                name
+            });
+            saveState();
+            renderOrgTreeEditor();
+        }
+
+        function deleteGeneralDept(cIdx, gIdx) {
+            orgData.centralDepts[cIdx].generalDepts.splice(gIdx, 1);
+            saveState();
+            renderOrgTreeEditor();
+        }
+
+        // Tab Switching
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('bg-sky-700', 'text-white', 'shadow-md');
+                el.classList.add('bg-white', 'text-slate-600', 'border', 'border-slate-200');
+            });
+
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.classList.remove('bg-white', 'text-slate-600', 'border', 'border-slate-200');
+            activeBtn.classList.add('bg-sky-700', 'text-white', 'shadow-md');
+        }
+
+        // Storage Directory Picker
+        function openStorageModal() { document.getElementById('storageModal').classList.remove('hidden'); }
+        function closeStorageModal() { document.getElementById('storageModal').classList.add('hidden'); }
+
+        async function pickStorageDirectory() {
+            try {
+                if ('showDirectoryPicker' in window) {
+                    selectedDirectoryHandle = await window.showDirectoryPicker();
+                    document.getElementById('storagePathLabel').innerText = selectedDirectoryHandle.name;
+                    document.getElementById('currentFolderDisplay').innerText = "المسار المحدد: " + selectedDirectoryHandle.name;
+                    showToast("تم تحديد مجلد التخزين بنجاح!");
+                    closeStorageModal();
+                } else {
+                    showToast("متصفحك يحفظ الملفات تلقائياً في مجلد التنزيلات (Downloads).", "error");
+                    closeStorageModal();
+                }
+            } catch (err) {}
+        }
+
+        // Toast Notification
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+            
+            toastMsg.innerText = msg;
+            toastIcon.className = type === 'success' ? 'fa-solid fa-circle-check text-emerald-400' : 'fa-solid fa-triangle-exclamation text-amber-400';
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3500);
+        }
+    </script>
+</body>
+</html>
